@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>YOLO Object Detection</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            padding: 40px;
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 2.5em;
+        }
+        .upload-box {
+            border: 3px dashed #667eea;
+            border-radius: 15px;
+            padding: 40px;
+            text-align: center;
+            background: #f8f9ff;
+            transition: all 0.3s;
+        }
+        .upload-box:hover {
+            border-color: #764ba2;
+            background: #f0f2ff;
+        }
+        input[type="file"] {
+            display: none;
+        }
+        .file-label {
+            display: inline-block;
+            padding: 12px 30px;
+            background: #667eea;
+            color: white;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: all 0.3s;
+        }
+        .file-label:hover {
+            background: #764ba2;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+        .detect-btn {
+            margin-top: 20px;
+            padding: 12px 40px;
+            background: #28a745;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .detect-btn:hover {
+            background: #218838;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+        .detect-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+        #fileName {
+            margin-top: 15px;
+            color: #666;
+            font-style: italic;
+        }
+        #loading {
+            display: none;
+            margin-top: 20px;
+            color: #667eea;
+            font-weight: bold;
+        }
+        #result {
+            margin-top: 30px;
+            display: none;
+        }
+        .result-image {
+            width: 100%;
+            border-radius: 10px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+            margin: 20px 0;
+        }
+        .detections-box {
+            background: #f8f9ff;
+            border-radius: 10px;
+            padding: 20px;
+            margin-top: 20px;
+        }
+        .detection-item {
+            background: white;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        .detection-class {
+            font-weight: bold;
+            color: #667eea;
+            font-size: 1.1em;
+        }
+        .detection-confidence {
+            color: #28a745;
+            font-weight: bold;
+        }
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎯 YOLO Object Detection</h1>
+        <div class="upload-box">
+            <label for="imageInput" class="file-label">
+                📁 Choose Image
+            </label>
+            <input type="file" id="imageInput" accept="image/*" onchange="displayFileName()">
+            <div id="fileName"></div>
+            <button class="detect-btn" onclick="uploadImage()" id="detectBtn" disabled>
+                🔍 Detect Objects
+            </button>
+        </div>
+        <div id="loading">
+            <div class="spinner"></div>
+            Processing image...
+        </div>
+        <div id="result"></div>
+    </div>
+
+    <script>
+        function displayFileName() {
+            const input = document.getElementById('imageInput');
+            const fileName = document.getElementById('fileName');
+            const detectBtn = document.getElementById('detectBtn');
+            
+            if (input.files.length > 0) {
+                fileName.textContent = '📄 ' + input.files[0].name;
+                detectBtn.disabled = false;
+            } else {
+                fileName.textContent = '';
+                detectBtn.disabled = true;
+            }
+        }
+
+        function uploadImage() {
+            const input = document.getElementById('imageInput');
+            const file = input.files[0];
+            
+            if (!file) {
+                alert('Please select an image');
+                return;
+            }
+
+            const loading = document.getElementById('loading');
+            const resultDiv = document.getElementById('result');
+            const detectBtn = document.getElementById('detectBtn');
+            
+            loading.style.display = 'block';
+            resultDiv.style.display = 'none';
+            detectBtn.disabled = true;
+
+            const formData = new FormData();
+            formData.append('image', file);
+
+            fetch('/predict', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                loading.style.display = 'none';
+                detectBtn.disabled = false;
+                
+                if (data.error) {
+                    alert('Error: ' + data.error);
+                    return;
+                }
+                
+                let detectionsHTML = '';
+                if (data.detections.length === 0) {
+                    detectionsHTML = '<p style="text-align: center; color: #666;">No objects detected</p>';
+                } else {
+                    data.detections.forEach((det, idx) => {
+                        detectionsHTML += `
+                            <div class="detection-item">
+                                <span class="detection-class">${det.class}</span>
+                                <span class="detection-confidence"> - Confidence: ${(det.confidence * 100).toFixed(2)}%</span>
+                            </div>
+                        `;
+                    });
+                }
+                
+                resultDiv.innerHTML = `
+                    <h2 style="color: #333; margin-bottom: 15px;">✅ Detection Results</h2>
+                    <img src="data:image/jpeg;base64,${data.image}" class="result-image" alt="Result">
+                    <div class="detections-box">
+                        <h3 style="color: #667eea; margin-bottom: 15px;">
+                            Detected Objects (${data.detections.length})
+                        </h3>
+                        ${detectionsHTML}
+                    </div>
+                `;
+                resultDiv.style.display = 'block';
+            })
+            .catch(error => {
+                loading.style.display = 'none';
+                detectBtn.disabled = false;
+                console.error('Error:', error);
+                alert('Error processing image. Please try again.');
+            });
+        }
+    </script>
+</body>
+</html>
