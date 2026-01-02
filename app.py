@@ -133,11 +133,10 @@ def health():
     return jsonify({'status': 'healthy', 'model': 'loaded'})
 
 if __name__ == '__main__':
+    port = int(os.environ.get('PORT', 5000))
     print("\n" + "="*50)
     print("🚀 Starting YOLO Flask Server")
     print("="*50)
-    print(f"📍 Access the web interface at: http://localhost:5000")
-    print(f"📍 API endpoint at: http://localhost:5000/predict_api")
-    print(f"📍 Health check at: http://localhost:5000/health")
+    print(f"📍 Server running on port: {port}")
     print("="*50 + "\n")
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    app.run(debug=False, host='0.0.0.0', port=port)
